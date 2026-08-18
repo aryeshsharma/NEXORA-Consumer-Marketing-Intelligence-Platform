@@ -1,0 +1,6 @@
+segment_id,segment_name,age_band,gender_focus,region,purchasing_behavior
+SEG-1,Remote Professionals,28-42,Balanced,North America / EU,"High AOV, values ergonomics & desk setup productivity"
+SEG-2,Gen Z Content Creators,18-24,Female Leaning,Urban Global,"High Social response, aesthetic lighting & trendy decor"
+SEG-3,Wellness & Mindful Living,25-45,Female Leaning,Suburban,High repeat purchases in aromatherapy & desk wellness
+SEG-4,Tech Enthusiasts & Gamers,20-35,Male Leaning,North America / Asia,High spend on premium desk accessories & monitor bars
+SEG-5,Bargain Seekers,22-50,Balanced,Global,"Price sensitive, purchases during promotional discounts & sales"

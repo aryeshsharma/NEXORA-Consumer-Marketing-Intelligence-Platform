@@ -1,0 +1,13 @@
+product_id,category_id,product_name,sku,price,cost_price,margin_percent,avg_rating,review_count,sample_review,review_sentiment
+PRD-101,CAT-1,AuraDesk Pro Standing Desk,AL-DESK-PRO,599.0,240.0,59.93,4.8,142,Incredible stability and slick wooden finish. Changed my work-from-home routine completely!,Positive
+PRD-102,CAT-1,ErgoFlow Mesh Chair,AL-CHAIR-MESH,349.0,125.0,64.18,4.6,98,"Great lumbar support, though the armrests could use slightly softer padding.",Positive
+PRD-103,CAT-1,Balance Active Stool,AL-STOOL-ACT,149.0,50.0,66.44,3.9,45,Good core engagement but gets uncomfortable after 2 hours of continuous sitting.,Mixed
+PRD-201,CAT-2,Lumina Glow Smart Desk Lamp,AL-LAMP-GLOW,89.0,28.0,68.54,4.9,210,The natural daylight mode reduces eye strain significantly during late night coding sessions.,Positive
+PRD-202,CAT-2,Horizon Sunset Mood Bar,AL-LAMP-SUNSET,69.0,20.0,71.01,4.7,175,Vibrant colors! Created an aesthetic background for all my video calls and social posts.,Positive
+PRD-203,CAT-2,Eclipse Ambient Monitor Lightbar,AL-BAR-ECLIPSE,79.0,24.0,69.62,4.5,88,Zero screen glare and simple touch controls. Fits my curved monitor perfectly.,Positive
+PRD-301,CAT-3,Modular Walnut Desk Shelf,AL-SHELF-WALNUT,129.0,38.0,70.54,4.7,130,Premium real wood grain. Keeps my dual monitor setup clean and elevated.,Positive
+PRD-302,CAT-3,Acoustic Felt Wall Tile Pack,AL-TILE-FELT,59.0,15.0,74.58,4.2,64,Dampens echo well in small home offices. Easy adhesive installation.,Positive
+PRD-303,CAT-3,Magnetic Cable Management System,AL-CABLE-MAG,29.0,6.0,79.31,3.7,52,"Magnets are a bit weak for thick braided cords, but works okay for phone chargers.",Mixed
+PRD-401,CAT-4,ZenMist Ceramic Diffuser,AL-DIFF-ZEN,79.0,22.0,72.15,4.9,320,Whisper quiet operation and beautiful aesthetic ceramic cover. Smells amazing with lavender.,Positive
+PRD-402,CAT-4,Organic Essential Oils Trio,AL-OIL-TRIO,35.0,8.0,77.14,4.8,280,Pure scents without synthetic perfume smell. Focus blend is a staple for morning work.,Positive
+PRD-403,CAT-4,Smart Hydration Tumbler,AL-BOTTLE-HYD,49.0,14.0,71.43,3.6,76,Battery life on LED timer lid is short and app pairing is glitchy.,Negative
