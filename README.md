@@ -211,7 +211,7 @@ The prototype operates on 15 synthetic operational datasets covering 2025 brand 
 ## 10. Project Directory Structure
 
 ```
-d:/WORK/PROJECT/
+d:/WORK/NEXORA/
 ├── data/
 │   ├── database.sqlite            # SQLite database file
 │   └── raw/                       # 15 Raw CSV datasets
@@ -287,7 +287,7 @@ The FastAPI backend exposes the following REST API endpoints:
 
 ### Step 1: Clone & Install Frontend Dependencies
 ```bash
-cd d:/WORK/PROJECT
+cd d:/WORK/NEXORA
 npm install
 ```
 
