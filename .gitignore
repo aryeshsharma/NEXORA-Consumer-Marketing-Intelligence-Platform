@@ -34,3 +34,8 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Local runtime data
+data/uploads/*
+!data/uploads/.gitkeep
+

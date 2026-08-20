@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
 
-export default function OverviewView({ onNavigateToAnalyze }) {
+export default function OverviewView({ activeDataset, onNavigateToAnalyze }) {
   const [data, setData] = useState(null);
   const [aiData, setAiData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +36,7 @@ export default function OverviewView({ onNavigateToAnalyze }) {
   }
 
   const { summary } = data;
+  const brandName = activeDataset?.active_brand_name || 'Brand';
 
   const analysisEntryPoints = [
     { id: 'campaigns', title: 'Campaign Performance', description: 'Historical campaign return, spend vs. revenue, ROAS, and campaign comparisons.' },
@@ -50,10 +51,10 @@ export default function OverviewView({ onNavigateToAnalyze }) {
       {/* Business Context */}
       <div>
         <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Business Overview
+          Business Overview &mdash; {brandName}
         </h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.15rem', maxWidth: '750px', lineHeight: '1.4' }}>
-          NEXORA DTC brand intelligence workspace. Synthesizes 2025 cross-domain historical data into evidence-based strategic insights.
+          Intelligence workspace for <strong>{brandName}</strong>. Synthesizes cross-domain historical data into evidence-based strategic insights.
         </p>
       </div>
 
@@ -61,7 +62,7 @@ export default function OverviewView({ onNavigateToAnalyze }) {
       <div className="grid-cols-4" style={{ gap: '0.75rem' }}>
         <div className="metric-card">
           <div className="metric-label">Revenue</div>
-          <div className="metric-value">${(summary.total_revenue / 1000).toFixed(0)}K</div>
+          <div className="metric-value">${(summary.total_revenue / 1000).toFixed(1)}K</div>
           <div className="metric-sub">${summary.total_revenue.toLocaleString()}</div>
         </div>
 
@@ -92,7 +93,7 @@ export default function OverviewView({ onNavigateToAnalyze }) {
               KEY ANALYTICAL FINDING
             </span>
             <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', fontWeight: 500, marginTop: '0.2rem', lineHeight: '1.4' }}>
-              {aiData && aiData.observed && aiData.observed[0] ? aiData.observed[0] : `Q4 Festive sales driven by 'Diwali & Festive Glow' generated the highest revenue scale ($305K) at 5.24x ROAS, while customer retention achieved a strong 75.7% repeat rate.`}
+              {aiData && aiData.observed && aiData.observed[0] ? aiData.observed[0] : `Top campaign '${summary.top_campaign}' led revenue generation with ${summary.overall_roas}x ROAS, supporting a ${summary.repeat_purchase_rate}% repeat purchase rate across ${summary.total_orders.toLocaleString()} orders.`}
             </p>
           </div>
           <button 

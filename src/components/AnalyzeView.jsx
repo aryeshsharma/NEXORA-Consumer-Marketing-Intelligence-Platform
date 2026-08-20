@@ -54,7 +54,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
         setFunnelData(json);
       }
 
-      const aiArea = domain === 'campaigns' ? 'campaigns' : domain === 'content' ? 'content' : domain === 'commerce' || domain === 'customers' ? 'commerce' : 'overview';
+      const aiArea = domain === 'campaigns' ? 'campaigns' : domain === 'content' ? 'content' : (domain === 'commerce' || domain === 'customers') ? 'commerce' : domain === 'funnel' ? 'funnel' : 'overview';
       const aiRes = await fetch('/api/ai/interpret', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -81,7 +81,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      {/* Domain Selector Pills (Active: Blue, Inactive: Quiet Neutral) */}
+      {/* Domain Selector Pills */}
       <div className="domain-selector">
         {domainTabs.map(d => (
           <button
@@ -131,7 +131,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
             const selectedCmp = campaigns.find(c => c.campaign_id === selectedCmpId) || campaigns[0];
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                {/* Campaign Selector Buttons (Quiet Neutrals) */}
+                {/* Campaign Selector Buttons */}
                 <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
                   {campaigns.map(c => (
                     <button
@@ -166,7 +166,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                   </div>
                 </div>
 
-                {/* MAIN ANALYTICAL FINDING (Visual Anchor) */}
+                {/* MAIN ANALYTICAL FINDING */}
                 <div className="card" style={{ padding: '0.9rem 1.1rem', borderLeft: '3px solid var(--accent-primary)' }}>
                   <div style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--accent-primary)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
                     CAMPAIGN CONCLUSION
@@ -282,16 +282,16 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
               <div className="grid-cols-3" style={{ gap: '0.75rem' }}>
                 <div className="metric-card">
                   <div className="metric-label">Analyzed Social Posts</div>
-                  <div className="metric-value">{contentData.leaderboard.length}</div>
+                  <div className="metric-value">{contentData.summary?.total_posts || contentData.leaderboard.length}</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Top Creative Format</div>
-                  <div className="metric-value" style={{ fontSize: '1.2rem' }}>Reels / Short Video</div>
-                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>5.2% Avg Engagement</div>
+                  <div className="metric-value" style={{ fontSize: '1.2rem' }}>{contentData.summary?.top_format || 'N/A'}</div>
+                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>{contentData.summary?.top_format_engagement_rate || 0}% Avg Engagement</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Top Content Theme</div>
-                  <div className="metric-value" style={{ fontSize: '1.2rem' }}>Desk Tour Aesthetic</div>
+                  <div className="metric-value" style={{ fontSize: '1.2rem' }}>{contentData.summary?.top_theme || 'N/A'}</div>
                 </div>
               </div>
 
@@ -300,7 +300,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                   CONTENT MAIN FINDING
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                  Short-form video Reels and TikTok clips drive 3x higher impression discovery, while multi-slide carousels generate the highest save rate and direct website clickthroughs.
+                  {contentData.summary?.main_finding || (aiData?.observed?.[0] || 'Content engagement analysis.')}
                 </p>
               </div>
 
@@ -347,7 +347,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {contentData.leaderboard.slice(0, 8).map((p, i) => (
+                        {contentData.leaderboard.slice(0, 10).map((p, i) => (
                           <tr key={i}>
                             <td style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{p.post_id}</td>
                             <td>{p.platform}</td>
@@ -392,16 +392,16 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
               <div className="grid-cols-3" style={{ gap: '0.75rem' }}>
                 <div className="metric-card">
                   <div className="metric-label">Top Product Revenue</div>
-                  <div className="metric-value" style={{ fontSize: '1.1rem' }}>{commerceData.products[0].product_name}</div>
-                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>${commerceData.products[0].total_revenue.toLocaleString()}</div>
+                  <div className="metric-value" style={{ fontSize: '1.1rem' }}>{commerceData.summary?.top_product || commerceData.products[0]?.product_name}</div>
+                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>${(commerceData.summary?.top_product_revenue || commerceData.products[0]?.total_revenue || 0).toLocaleString()}</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Avg Margin %</div>
-                  <div className="metric-value">62.4%</div>
+                  <div className="metric-value">{commerceData.summary?.avg_margin_percent || 0}%</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Catalog Size</div>
-                  <div className="metric-value">{commerceData.products.length} Products</div>
+                  <div className="metric-value">{commerceData.summary?.total_catalog_size || commerceData.products.length} Products</div>
                 </div>
               </div>
 
@@ -410,7 +410,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                   COMMERCE MAIN FINDING
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                  Standing desks and monitor lightbars drive 64% of total catalog revenue, while essential oil aromatherapy trios serve as high-volume initial customer acquisition drivers.
+                  {commerceData.summary?.main_finding || (aiData?.observed?.[0] || 'Commerce revenue breakdown.')}
                 </p>
               </div>
 
@@ -483,16 +483,16 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
               <div className="grid-cols-3" style={{ gap: '0.75rem' }}>
                 <div className="metric-card">
                   <div className="metric-label">Top Segment Revenue</div>
-                  <div className="metric-value" style={{ fontSize: '1.1rem' }}>{commerceData.segments[0].segment_name}</div>
-                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>${commerceData.segments[0].total_revenue.toLocaleString()}</div>
+                  <div className="metric-value" style={{ fontSize: '1.1rem' }}>{commerceData.summary?.top_segment_name || commerceData.segments[0]?.segment_name}</div>
+                  <div className="metric-sub" style={{ fontSize: '0.75rem' }}>${(commerceData.summary?.top_segment_revenue || commerceData.segments[0]?.total_revenue || 0).toLocaleString()}</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Highest Segment LTV</div>
-                  <div className="metric-value">${commerceData.segments[0].avg_customer_ltv}</div>
+                  <div className="metric-value">${(commerceData.summary?.top_segment_ltv || commerceData.segments[0]?.avg_customer_ltv || 0).toFixed(2)}</div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Repeat Purchase Rate</div>
-                  <div className="metric-value">75.7%</div>
+                  <div className="metric-value">{commerceData.summary?.repeat_purchase_rate || 0}%</div>
                 </div>
               </div>
 
@@ -501,7 +501,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                   CUSTOMER SEGMENT MAIN FINDING
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                  Remote Professionals (Age 28-42) represent the most valuable customer segment ($285 AOV and highest LTV), whereas Gen Z Creators respond fastest to social video promotion.
+                  {commerceData.summary?.segments_main_finding || (aiData?.observed?.[1] || 'Customer segment metrics.')}
                 </p>
               </div>
 
@@ -574,7 +574,13 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
               <div className="grid-cols-3" style={{ gap: '0.75rem' }}>
                 <div className="metric-card">
                   <div className="metric-label">Ad Impressions</div>
-                  <div className="metric-value">15.7M</div>
+                  <div className="metric-value">
+                    {funnelData.summary?.total_impressions 
+                      ? (funnelData.summary.total_impressions >= 1000000 
+                          ? (funnelData.summary.total_impressions / 1000000).toFixed(1) + 'M' 
+                          : (funnelData.summary.total_impressions / 1000).toFixed(0) + 'K') 
+                      : 'N/A'}
+                  </div>
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Visit-to-Order Rate</div>
@@ -582,7 +588,9 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                 </div>
                 <div className="metric-card">
                   <div className="metric-label">Primary Drop-off Stage</div>
-                  <div className="metric-value" style={{ fontSize: '1.1rem', color: '#b45309' }}>Ad CTR (3.2%)</div>
+                  <div className="metric-value" style={{ fontSize: '1.05rem', color: '#b45309' }}>
+                    {funnelData.summary?.primary_drop_off_stage || 'Ad Drop-off'}
+                  </div>
                 </div>
               </div>
 
@@ -591,7 +599,7 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                   FUNNEL BOTTLENECK FINDING
                 </div>
                 <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4' }}>
-                  The primary conversion drop-off occurs at top-of-funnel ad clickthrough (3.2% CTR). On-site product page views convert strongly at a 68.4% cart completion rate.
+                  {funnelData.summary?.main_finding || (aiData?.observed?.[0] || 'Conversion funnel drop-off analysis.')}
                 </p>
               </div>
 
@@ -620,19 +628,24 @@ export default function AnalyzeView({ initialDomain = 'campaigns' }) {
                 </div>
               )}
 
-              {showAI && (
+              {showAI && aiData && (
                 <div className="ai-panel">
                   <div className="ai-section">
                     <div className="ai-section-header"><span className="badge-observed">OBSERVED</span></div>
                     <ul className="ai-list">
-                      <li>Top conversion drop-off is between ad impressions and website visits (3.2% CTR).</li>
-                      <li>Cart abandonment sits at ~31.6% of shoppers who add items to cart.</li>
+                      {aiData.observed.map((item, i) => <li key={i}>{item}</li>)}
+                    </ul>
+                  </div>
+                  <div className="ai-section">
+                    <div className="ai-section-header"><span className="badge-inferred">INFERRED</span></div>
+                    <ul className="ai-list">
+                      {aiData.inferred.map((item, i) => <li key={i}>{item}</li>)}
                     </ul>
                   </div>
                   <div className="ai-section">
                     <div className="ai-section-header"><span className="badge-recommended">RECOMMENDED</span></div>
                     <ul className="ai-list">
-                      <li>Implement 1-hour automated cart abandonment email notifications to recover lost revenue.</li>
+                      {aiData.recommended.map((item, i) => <li key={i}>{item}</li>)}
                     </ul>
                   </div>
                 </div>

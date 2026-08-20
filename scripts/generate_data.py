@@ -22,7 +22,7 @@ def format_date(dt):
 def format_datetime(dt):
     return dt.strftime("%Y-%m-%d %H:%M:%S")
 
-print("Generating 15 Interconnected Datasets for AuraLiving...")
+print("Generating 15 Interconnected Datasets for NEXORA...")
 
 # ---------------------------------------------------------
 # 1. Product Categories (4 categories)

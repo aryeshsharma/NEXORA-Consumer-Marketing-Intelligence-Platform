@@ -10,23 +10,28 @@ import {
   FileText, 
   Trash2, 
   CheckCircle2, 
+  AlertCircle,
   Tag, 
   DollarSign, 
   TrendingUp, 
   Layers,
-  Database
+  Database,
+  Play,
+  RotateCcw
 } from 'lucide-react';
 
-export default function ProjectsView() {
+export default function ProjectsView({ activeDataset, onDatasetChange }) {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeProject, setActiveProject] = useState(null);
   const [cmpDetail, setCmpDetail] = useState(null);
+  const [activatingId, setActivatingId] = useState(null);
   
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Form states
   const [projectName, setProjectName] = useState('');
@@ -45,6 +50,7 @@ export default function ProjectsView() {
     'Wellness & Aromatherapy',
     'Festive Gifting',
     'Retargeting & Retention',
+    'Audio & Electronics',
     'Creator & Influencer',
     'Product Launch',
     'Custom Growth Initiative'
@@ -91,6 +97,42 @@ export default function ProjectsView() {
     }
   };
 
+  const handleActivateDataset = async (projectId) => {
+    setActivatingId(projectId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}/activate`, { method: 'POST' });
+      if (!res.ok) {
+        const errJson = await res.json();
+        alert(`Failed to activate dataset: ${errJson.detail || 'Error'}`);
+        return;
+      }
+      const data = await res.json();
+      setSuccessMsg(`Dataset for project ${projectId} activated successfully (${data.total_records} records)!`);
+      setTimeout(() => setSuccessMsg(''), 4000);
+      await fetchProjects();
+      if (onDatasetChange) onDatasetChange();
+    } catch (err) {
+      console.error('Error activating project dataset:', err);
+      alert('Error activating project dataset.');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  const handleResetToBaseline = async () => {
+    try {
+      const res = await fetch('/api/dataset/activate-baseline', { method: 'POST' });
+      if (res.ok) {
+        setSuccessMsg('Active dataset restored to NEXORA Baseline Demo Dataset.');
+        setTimeout(() => setSuccessMsg(''), 4000);
+        await fetchProjects();
+        if (onDatasetChange) onDatasetChange();
+      }
+    } catch (err) {
+      console.error('Error resetting baseline:', err);
+    }
+  };
+
   const handleFileDrop = (e) => {
     e.preventDefault();
     setIsDragOver(false);
@@ -118,10 +160,12 @@ export default function ProjectsView() {
         const lowerName = file.name.toLowerCase();
         if (lowerName.includes('spend')) guessedType = 'Marketing Spend';
         else if (lowerName.includes('metric')) guessedType = 'Marketing Metrics';
+        else if (lowerName.includes('order_item')) guessedType = 'Order Items';
         else if (lowerName.includes('order')) guessedType = 'Orders & Transactions';
         else if (lowerName.includes('cust')) guessedType = 'Customer Profiles';
+        else if (lowerName.includes('post_metric')) guessedType = 'Social Post Metrics';
         else if (lowerName.includes('post') || lowerName.includes('social')) guessedType = 'Social Posts & Reach';
-        else if (lowerName.includes('prod') || lowerName.includes('catalog')) guessedType = 'Product Catalog & Margins';
+        else if (lowerName.includes('prod')) guessedType = 'Product Catalog & Margins';
         else if (lowerName.includes('attr')) guessedType = 'Attribution Touchpoints';
 
         setStagedFiles(prev => [
@@ -150,8 +194,9 @@ export default function ProjectsView() {
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
+    setErrorMsg('');
     if (!projectName.trim() || !description.trim()) {
-      alert('Please provide a Project Name and Description.');
+      setErrorMsg('Please provide a Project Name and Description.');
       return;
     }
 
@@ -180,11 +225,15 @@ export default function ProjectsView() {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Failed to create project');
-      const newProj = await res.json();
+      if (!res.ok) {
+        const errJson = await res.json();
+        throw new Error(errJson.detail || 'Failed to create project');
+      }
+      const data = await res.json();
+      const newProj = data.project || data;
 
-      setSuccessMsg(`Project "${newProj.project_name}" created with ${stagedFiles.length} dataset(s) attached!`);
-      setTimeout(() => setSuccessMsg(''), 4000);
+      setSuccessMsg(`Project "${newProj.project_name}" created and dataset activated successfully (${stagedFiles.length} files)!`);
+      setTimeout(() => setSuccessMsg(''), 5000);
 
       // Reset form
       setProjectName('');
@@ -195,11 +244,12 @@ export default function ProjectsView() {
       setStagedFiles([]);
       setShowAddModal(false);
 
-      // Refresh list
+      // Refresh list & signal change
       await fetchProjects();
+      if (onDatasetChange) onDatasetChange();
     } catch (err) {
       console.error('Error creating project:', err);
-      alert('Failed to save project. Please try again.');
+      setErrorMsg(err.message || 'Failed to save project. Please check dataset format.');
     } finally {
       setSubmitting(false);
     }
@@ -211,7 +261,8 @@ export default function ProjectsView() {
       const res = await fetch(`/api/projects/${projectId}`, { method: 'DELETE' });
       if (res.ok) {
         setActiveProject(null);
-        fetchProjects();
+        await fetchProjects();
+        if (onDatasetChange) onDatasetChange();
       } else {
         alert('Cannot delete standard template project.');
       }
@@ -232,6 +283,8 @@ export default function ProjectsView() {
     return <div className="loading-spinner"><Sparkles size={16} className="spin" /> Loading Projects Workspace...</div>;
   }
 
+  const isCustomDatasetActive = activeDataset?.active_dataset_type === 'custom';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {/* Header with Title and Add Project Button */}
@@ -245,13 +298,26 @@ export default function ProjectsView() {
           </p>
         </div>
 
-        <button 
-          className="btn btn-primary"
-          onClick={() => setShowAddModal(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1rem', fontSize: '0.85rem' }}
-        >
-          <Plus size={16} /> Add New Project
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {isCustomDatasetActive && (
+            <button 
+              className="btn btn-secondary"
+              onClick={handleResetToBaseline}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}
+              title="Switch active engine back to baseline NEXORA dataset"
+            >
+              <RotateCcw size={14} /> Restore NEXORA Baseline
+            </button>
+          )}
+
+          <button 
+            className="btn btn-primary"
+            onClick={() => { setErrorMsg(''); setShowAddModal(true); }}
+            style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', padding: '0.55rem 1rem', fontSize: '0.85rem' }}
+          >
+            <Plus size={16} /> Add New Project & Dataset
+          </button>
+        </div>
       </div>
 
       {/* Success Notification Banner */}
@@ -265,14 +331,33 @@ export default function ProjectsView() {
       <div className="grid-cols-2">
         {projects.map(prj => {
           const filesCount = prj.uploaded_files ? prj.uploaded_files.length : 0;
+          const isActive = (activeDataset?.active_project_id === prj.project_id);
+          const canActivate = prj.has_dataset && !isActive;
+
           return (
-            <div key={prj.project_id} className="card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <div 
+              key={prj.project_id} 
+              className="card" 
+              style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                justifyContent: 'space-between',
+                border: isActive ? '2px solid #0284c7' : '1px solid var(--border-color)',
+                boxShadow: isActive ? '0 0 0 1px #0284c7' : 'none'
+              }}
+            >
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem', flexWrap: 'wrap', gap: '0.4rem' }}>
                   <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-                    <span className={prj.status === 'Active' ? 'badge-inferred' : 'badge-observed'}>
-                      {prj.status || 'Active'}
-                    </span>
+                    {isActive ? (
+                      <span style={{ background: '#dbeafe', color: '#0369a1', border: '1px solid #93c5fd', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.7rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Database size={11} /> ACTIVE DATASET
+                      </span>
+                    ) : (
+                      <span className={prj.status === 'Active' ? 'badge-inferred' : 'badge-observed'}>
+                        {prj.status || 'Active'}
+                      </span>
+                    )}
                     {prj.category && (
                       <span className="category-tag">
                         {prj.category}
@@ -308,23 +393,36 @@ export default function ProjectsView() {
                   {filesCount > 0 && (
                     <div style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--accent-primary-light)', color: 'var(--accent-primary)', padding: '0.2rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
                       <Database size={12} />
-                      <span>{filesCount} Dataset{filesCount > 1 ? 's' : ''} Attached</span>
+                      <span>{filesCount} Dataset{filesCount > 1 ? 's' : ''}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
                 <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
                   {prj.campaign_id || prj.project_id}
                 </span>
-                <button 
-                  className="btn btn-secondary"
-                  onClick={() => openProjectDetails(prj)}
-                  style={{ fontSize: '0.8rem' }}
-                >
-                  View Project Details <ArrowRight size={14} />
-                </button>
+                
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  {canActivate && (
+                    <button 
+                      className="btn btn-secondary"
+                      onClick={() => handleActivateDataset(prj.project_id)}
+                      disabled={activatingId === prj.project_id}
+                      style={{ fontSize: '0.78rem', color: '#0369a1', borderColor: '#93c5fd', background: '#f0f9ff' }}
+                    >
+                      <Play size={12} /> {activatingId === prj.project_id ? 'Activating...' : 'Activate'}
+                    </button>
+                  )}
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => openProjectDetails(prj)}
+                    style={{ fontSize: '0.8rem' }}
+                  >
+                    Details <ArrowRight size={13} />
+                  </button>
+                </div>
               </div>
             </div>
           );
@@ -340,7 +438,7 @@ export default function ProjectsView() {
             <div className="modal-header">
               <div className="modal-title">
                 <UploadCloud size={20} color="var(--accent-primary)" />
-                Create New Project & Upload Data
+                Create New Project & Ingest Dataset
               </div>
               <button 
                 className="btn btn-secondary" 
@@ -354,14 +452,25 @@ export default function ProjectsView() {
 
             <form onSubmit={handleCreateProject} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
               <div className="modal-body">
+                {/* Validation Error Banner */}
+                {errorMsg && (
+                  <div style={{ padding: '0.75rem 1rem', background: '#fee2e2', border: '1px solid #f87171', borderRadius: 'var(--radius-md)', color: '#b91c1c', fontSize: '0.82rem', display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <AlertCircle size={16} style={{ marginTop: '0.1rem', flexShrink: 0 }} />
+                    <div>
+                      <strong>Validation Error:</strong>
+                      <div style={{ marginTop: '0.15rem' }}>{errorMsg}</div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Project Name & Category */}
                 <div className="grid-cols-2" style={{ gap: '0.75rem' }}>
                   <div className="form-group">
-                    <label className="form-label">Project Name *</label>
+                    <label className="form-label">Project / Brand Name *</label>
                     <input 
                       type="text" 
                       className="form-input"
-                      placeholder="e.g. Q3 Smart Living Launch"
+                      placeholder="e.g. Apex Audio Expansion"
                       value={projectName}
                       onChange={(e) => setProjectName(e.target.value)}
                       required
@@ -398,7 +507,7 @@ export default function ProjectsView() {
                     <input 
                       type="number" 
                       className="form-input"
-                      placeholder="e.g. 25000"
+                      placeholder="e.g. 35000"
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
                       min="0"
@@ -411,7 +520,7 @@ export default function ProjectsView() {
                       type="number" 
                       step="0.1"
                       className="form-input"
-                      placeholder="e.g. 4.2"
+                      placeholder="e.g. 4.0"
                       value={targetRoas}
                       onChange={(e) => setTargetRoas(e.target.value)}
                       min="0"
@@ -424,7 +533,7 @@ export default function ProjectsView() {
                   <label className="form-label">Project Description & Strategic Objectives *</label>
                   <textarea 
                     className="form-textarea"
-                    placeholder="Describe the campaign focus, target channels, expected outcomes, and creative strategy..."
+                    placeholder="Describe the campaign focus, target channels, brand objectives, and uploaded dataset details..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     required
@@ -434,8 +543,8 @@ export default function ProjectsView() {
                 {/* Data Upload Dropzone */}
                 <div className="form-group">
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>Upload Dataset Files (CSV, JSON)</span>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Attach operational records to project</span>
+                    <span>Upload Dataset Files (15 CSVs for full analytical engine ingestion)</span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>Supports CSV drag & drop</span>
                   </label>
 
                   <div 
@@ -447,12 +556,12 @@ export default function ProjectsView() {
                   >
                     <UploadCloud size={28} className="dropzone-icon" />
                     <div className="dropzone-text">Click to choose files or drag & drop here</div>
-                    <div className="dropzone-subtext">Supports .csv, .json datasets (e.g. Marketing Spend, Orders, Metrics)</div>
+                    <div className="dropzone-subtext">Drop all 15 CSV files (e.g. products.csv, orders.csv, campaigns.csv, etc.)</div>
                     <input 
                       ref={fileInputRef}
                       type="file" 
                       multiple 
-                      accept=".csv,.json,.txt,.xlsx"
+                      accept=".csv,.json,.txt"
                       style={{ display: 'none' }}
                       onChange={handleFileSelect}
                     />
@@ -461,8 +570,9 @@ export default function ProjectsView() {
                   {/* Staged files list */}
                   {stagedFiles.length > 0 && (
                     <div className="uploaded-files-list">
-                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-                        {stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''} staged for ingestion:
+                      <div style={{ fontSize: '0.75rem', fontWeight: 600, color: stagedFiles.length >= 15 ? 'var(--badge-observed-text)' : 'var(--text-muted)', marginTop: '0.2rem', display: 'flex', justifyContent: 'space-between' }}>
+                        <span>{stagedFiles.length} file{stagedFiles.length > 1 ? 's' : ''} staged:</span>
+                        {stagedFiles.length >= 15 && <span style={{ color: 'var(--badge-observed-text)' }}>✓ Ready for Full Analytical Ingestion</span>}
                       </div>
                       {stagedFiles.map(file => (
                         <div key={file.id} className="uploaded-file-item">
@@ -519,7 +629,7 @@ export default function ProjectsView() {
                   style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}
                 >
                   {submitting ? <Sparkles size={14} className="spin" /> : <Plus size={14} />}
-                  {submitting ? 'Creating & Ingesting...' : 'Create Project & Upload Data'}
+                  {submitting ? 'Validating & Ingesting...' : stagedFiles.length >= 15 ? 'Validate & Activate Dataset' : 'Create Project & Upload'}
                 </button>
               </div>
             </form>
@@ -543,11 +653,17 @@ export default function ProjectsView() {
             </div>
 
             <div className="modal-body">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <span className={activeProject.status === 'Active' ? 'badge-inferred' : 'badge-observed'}>
-                    {activeProject.status || 'Active'}
-                  </span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                  {activeDataset?.active_project_id === activeProject.project_id ? (
+                    <span style={{ background: '#dbeafe', color: '#0369a1', border: '1px solid #93c5fd', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.7rem', fontWeight: 700 }}>
+                      ACTIVE DATASET
+                    </span>
+                  ) : (
+                    <span className={activeProject.status === 'Active' ? 'badge-inferred' : 'badge-observed'}>
+                      {activeProject.status || 'Active'}
+                    </span>
+                  )}
                   {activeProject.category && (
                     <span className="category-tag">{activeProject.category}</span>
                   )}
@@ -633,7 +749,16 @@ export default function ProjectsView() {
             </div>
 
             <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
-              <div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                {activeProject.has_dataset && activeDataset?.active_project_id !== activeProject.project_id && (
+                  <button 
+                    className="btn btn-secondary"
+                    onClick={() => { handleActivateDataset(activeProject.project_id); setActiveProject(null); }}
+                    style={{ fontSize: '0.78rem', color: '#0369a1', borderColor: '#93c5fd' }}
+                  >
+                    <Play size={12} /> Activate This Dataset
+                  </button>
+                )}
                 {activeProject.project_id.startsWith('PRJ-0') && parseInt(activeProject.project_id.split('-')[1]) > 5 && (
                   <button 
                     className="btn btn-secondary" 

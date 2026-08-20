@@ -1,12 +1,24 @@
 import os
+import sys
 import json
+import shutil
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict
 
-from db import init_db, ingest_csv_data
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from db import (
+    init_db,
+    ingest_csv_data,
+    get_active_dataset_info,
+    set_active_dataset_info,
+    DATA_RAW_DIR,
+    UPLOADS_DIR,
+    DATA_DIR
+)
 from analytics import (
     get_executive_overview,
     get_campaign_analytics,
@@ -17,9 +29,17 @@ from analytics import (
 )
 from ai_reasoner import interpret_area, recommend_next_campaign
 
-# Initialize DB on server start
+# Initialize DB on server start with active dataset
 init_db()
-ingest_csv_data()
+active_dataset = get_active_dataset_info()
+try:
+    if active_dataset.get("source_dir") and os.path.exists(active_dataset["source_dir"]):
+        ingest_csv_data(source_dir=active_dataset["source_dir"], project_id=active_dataset.get("active_project_id"), project_name=active_dataset.get("active_project_name"))
+    else:
+        ingest_csv_data()
+except Exception as e:
+    print(f"Warning on startup dataset ingestion: {e}")
+    ingest_csv_data()
 
 app = FastAPI(title="NEXORA Consumer & Marketing Intelligence Platform API", version="1.0.0")
 
@@ -57,9 +77,7 @@ class CreateProjectRequest(BaseModel):
     status: Optional[str] = "Active"
     uploaded_files: Optional[List[UploadedFilePayload]] = []
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 CUSTOM_PROJECTS_FILE = os.path.join(DATA_DIR, "custom_projects.json")
-UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 # Default base projects in workspace
@@ -155,23 +173,64 @@ def save_custom_projects(projects: List[dict]):
 
 def get_all_projects() -> List[dict]:
     custom = load_custom_projects()
-    # Merge, ensuring no duplicates by project_id
+    active_info = get_active_dataset_info()
+    active_id = active_info.get("active_project_id")
+
     custom_ids = {p["project_id"] for p in custom}
     merged = [p for p in DEFAULT_PROJECTS if p["project_id"] not in custom_ids] + custom
+
+    # Decorate with is_active flag and has_full_dataset flag
+    for p in merged:
+        p["is_active"] = (p["project_id"] == active_id)
+        p_dir = os.path.join(UPLOADS_DIR, p["project_id"])
+        p["has_dataset"] = os.path.exists(p_dir) and len(os.listdir(p_dir)) >= 15
+
     return merged
 
 @app.get("/api/health")
 def health_check():
+    active_info = get_active_dataset_info()
     return {
         "status": "online",
-        "brand": "NEXORA",
+        "brand": active_info.get("active_brand_name", "NEXORA"),
+        "active_dataset": active_info,
         "database": "SQLite Relational DB Connected",
         "version": "1.0.0"
     }
 
+@app.get("/api/dataset/active")
+def get_active_dataset_endpoint():
+    return get_active_dataset_info()
+
+@app.post("/api/dataset/activate-baseline")
+def activate_baseline_endpoint():
+    res = ingest_csv_data(source_dir=DATA_RAW_DIR, project_id="PRJ-00", project_name="NEXORA Baseline Demo Dataset")
+    return res
+
+@app.post("/api/projects/{project_id}/activate")
+def activate_project_dataset_endpoint(project_id: str):
+    all_projects = get_all_projects()
+    match = next((p for p in all_projects if p["project_id"] == project_id), None)
+    if not match:
+        raise HTTPException(status_code=404, detail=f"Project {project_id} not found.")
+
+    project_dir = os.path.join(UPLOADS_DIR, project_id)
+    if not os.path.exists(project_dir):
+        raise HTTPException(status_code=400, detail=f"No dataset files found for project {project_id}.")
+
+    try:
+        res = ingest_csv_data(source_dir=project_dir, project_id=project_id, project_name=match["project_name"])
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to activate dataset: {str(e)}")
+
 @app.post("/api/ingest/reload")
 def reload_data():
-    res = ingest_csv_data()
+    active_info = get_active_dataset_info()
+    source_dir = active_info.get("source_dir", DATA_RAW_DIR)
+    if not os.path.exists(source_dir):
+        source_dir = DATA_RAW_DIR
+    res = ingest_csv_data(source_dir=source_dir, project_id=active_info.get("active_project_id"), project_name=active_info.get("active_project_name"))
     return res
 
 @app.get("/api/analytics/overview")
@@ -234,6 +293,23 @@ def create_project_endpoint(req: CreateProjectRequest):
                 "row_count": file_item.row_count or (len(file_item.content.splitlines()) - 1 if file_item.content else 0)
             })
 
+    # If the user uploaded a full 15-file dataset, validate and ingest it immediately
+    ingestion_result = None
+    if len(saved_files_metadata) >= 15:
+        try:
+            ingestion_result = ingest_csv_data(
+                source_dir=project_dir,
+                project_id=project_id,
+                project_name=req.project_name
+            )
+        except Exception as e:
+            # If validation fails, clean up the staged directory and return 400
+            try:
+                shutil.rmtree(project_dir)
+            except Exception:
+                pass
+            raise HTTPException(status_code=400, detail=f"Dataset Validation Failed: {str(e)}")
+
     new_project = {
         "project_id": project_id,
         "project_name": req.project_name,
@@ -244,22 +320,41 @@ def create_project_endpoint(req: CreateProjectRequest):
         "status": req.status or "Active",
         "description": req.description,
         "created_at": datetime.now().strftime("%Y-%m-%d"),
-        "uploaded_files": saved_files_metadata
+        "uploaded_files": saved_files_metadata,
+        "is_active": bool(ingestion_result),
+        "has_dataset": len(saved_files_metadata) >= 15
     }
 
     custom_projects = load_custom_projects()
     custom_projects.append(new_project)
     save_custom_projects(custom_projects)
 
-    return new_project
+    return {
+        "project": new_project,
+        "ingestion": ingestion_result,
+        "active_dataset": get_active_dataset_info()
+    }
 
 @app.delete("/api/projects/{project_id}")
 def delete_project_endpoint(project_id: str):
     custom_projects = load_custom_projects()
     updated = [p for p in custom_projects if p["project_id"] != project_id]
     if len(updated) == len(custom_projects):
-        # Might be a default project
         raise HTTPException(status_code=404, detail="Custom project not found or default project cannot be removed")
+    
+    # If the deleted project was the active one, revert back to baseline
+    active_info = get_active_dataset_info()
+    if active_info.get("active_project_id") == project_id:
+        ingest_csv_data(source_dir=DATA_RAW_DIR, project_id="PRJ-00", project_name="NEXORA Baseline Demo Dataset")
+
+    # Clean up uploads directory if present
+    p_dir = os.path.join(UPLOADS_DIR, project_id)
+    if os.path.exists(p_dir):
+        try:
+            shutil.rmtree(p_dir)
+        except Exception:
+            pass
+
     save_custom_projects(updated)
     return {"status": "success", "message": f"Project {project_id} deleted"}
 

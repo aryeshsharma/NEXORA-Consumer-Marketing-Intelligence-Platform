@@ -1,5 +1,8 @@
 import sqlite3
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from db import get_db_connection
 
@@ -20,11 +23,11 @@ def get_executive_overview():
     FROM daily_kpis
     """).fetchone()
 
-    total_revenue = kpi_summary['total_revenue'] or 0.0
-    total_spend = kpi_summary['total_spend'] or 0.0
-    total_orders = kpi_summary['total_orders'] or 0
-    new_custs = kpi_summary['new_customers'] or 0
-    ret_custs = kpi_summary['returning_customers'] or 0
+    total_revenue = (kpi_summary['total_revenue'] if kpi_summary else 0.0) or 0.0
+    total_spend = (kpi_summary['total_spend'] if kpi_summary else 0.0) or 0.0
+    total_orders = (kpi_summary['total_orders'] if kpi_summary else 0) or 0
+    new_custs = (kpi_summary['new_customers'] if kpi_summary else 0) or 0
+    ret_custs = (kpi_summary['returning_customers'] if kpi_summary else 0) or 0
     overall_roas = round(total_revenue / total_spend, 2) if total_spend > 0 else 0.0
     aov = round(total_revenue / total_orders, 2) if total_orders > 0 else 0.0
 
@@ -40,8 +43,8 @@ def get_executive_overview():
     )
     """).fetchone()
     
-    total_unique_cust = repeat_stats['total_unique_customers'] or 1
-    repeat_cust_count = repeat_stats['repeat_customers'] or 0
+    total_unique_cust = (repeat_stats['total_unique_customers'] if repeat_stats else 1) or 1
+    repeat_cust_count = (repeat_stats['repeat_customers'] if repeat_stats else 0) or 0
     repeat_rate = round((repeat_cust_count / total_unique_cust) * 100, 1)
 
     # Top performing campaign by revenue
@@ -130,13 +133,13 @@ def get_campaign_analytics():
         FROM customer_acquisition WHERE campaign_id = ?
         """, (cmp_id,)).fetchone()
 
-        tot_imp = metrics["total_impressions"] or 0
-        tot_reach = metrics["total_reach"] or 0
-        tot_clicks = metrics["total_clicks"] or 0
-        tot_conv = metrics["total_conversions"] or 0
-        tot_rev = metrics["total_attributed_revenue"] or 0.0
-        tot_spend = spend_data["total_spend"] or 0.0
-        tot_acq = acq_data["acq_count"] or 0
+        tot_imp = (metrics["total_impressions"] if metrics else 0) or 0
+        tot_reach = (metrics["total_reach"] if metrics else 0) or 0
+        tot_clicks = (metrics["total_clicks"] if metrics else 0) or 0
+        tot_conv = (metrics["total_conversions"] if metrics else 0) or 0
+        tot_rev = (metrics["total_attributed_revenue"] if metrics else 0.0) or 0.0
+        tot_spend = (spend_data["total_spend"] if spend_data else 0.0) or 0.0
+        tot_acq = (acq_data["acq_count"] if acq_data else 0) or 0
 
         ctr = round((tot_clicks / tot_imp * 100), 2) if tot_imp > 0 else 0.0
         conv_rate = round((tot_conv / tot_clicks * 100), 2) if tot_clicks > 0 else 0.0
@@ -158,6 +161,9 @@ def get_campaign_analytics():
             for ch in channel_breakdown
         ]
 
+        planned_budget = c["budget"] or 1.0
+        planned_roas = c["planned_roas"] or 0.0
+
         results.append({
             "campaign_id": cmp_id,
             "campaign_name": c["campaign_name"],
@@ -174,7 +180,7 @@ def get_campaign_analytics():
                 "featured_product_id": c["featured_product_id"],
                 "campaign_message": c["campaign_message"],
                 "offer_discount": c["offer_discount"],
-                "planned_roas": c["planned_roas"],
+                "planned_roas": planned_roas,
                 "planned_conversions": c["planned_conversions"]
             },
             "execution": {
@@ -182,7 +188,7 @@ def get_campaign_analytics():
                 "reach": tot_reach,
                 "frequency": round(tot_imp / max(1, tot_reach), 2),
                 "actual_spend": round(tot_spend, 2),
-                "budget_utilized_percent": round((tot_spend / c["budget"]) * 100, 1),
+                "budget_utilized_percent": round((tot_spend / planned_budget) * 100, 1),
                 "channels_breakdown": channels_info
             },
             "results": {
@@ -196,7 +202,7 @@ def get_campaign_analytics():
                 "acquisitions": tot_acq,
                 "attributed_revenue": round(tot_rev, 2),
                 "actual_roas": roas,
-                "roas_delta": round(roas - c["planned_roas"], 2),
+                "roas_delta": round(roas - planned_roas, 2),
                 "net_profit": round(tot_rev - tot_spend, 2)
             }
         })
@@ -242,6 +248,10 @@ def compare_campaigns(campaign_ids=None, selected_metrics=None):
     best_revenue = sorted_by_rev[0] if sorted_by_rev else None
     best_cpa = sorted_by_cpa[0] if sorted_by_cpa else None
 
+    tradeoff = ""
+    if best_roas and best_revenue:
+        tradeoff = f"Campaign '{best_roas['campaign_name']}' leads in efficiency with {best_roas['actual_roas']}x ROAS, whereas '{best_revenue['campaign_name']}' generated the largest total revenue scale at ${best_revenue['attributed_revenue']:,.2f}."
+
     return {
         "campaigns_compared": matrix,
         "rankings": {
@@ -249,7 +259,7 @@ def compare_campaigns(campaign_ids=None, selected_metrics=None):
             "highest_revenue": best_revenue["campaign_name"] if best_revenue else "N/A",
             "lowest_cpa": best_cpa["campaign_name"] if best_cpa else "N/A"
         },
-        "tradeoff_analysis": f"Campaign '{best_roas['campaign_name'] if best_roas else ''}' leads in efficiency with {best_roas['actual_roas'] if best_roas else ''} ROAS, whereas '{best_revenue['campaign_name'] if best_revenue else ''}' generated the largest total revenue scale at ${best_revenue['attributed_revenue']:,.2f}." if (best_roas and best_revenue) else ""
+        "tradeoff_analysis": tradeoff
     }
 
 def get_content_analytics():
@@ -295,7 +305,7 @@ def get_content_analytics():
             "engagement_rate": eng_rate
         })
 
-    # 2. Performance by format (Reels vs Carousel vs Static)
+    # 2. Performance by format
     format_stats = cursor.execute("""
     SELECT 
         sp.format,
@@ -348,7 +358,24 @@ def get_content_analytics():
 
     conn.close()
 
+    # Dynamic summary synthesis
+    top_format_item = max(by_format, key=lambda x: x["avg_engagement_rate"]) if by_format else None
+    top_theme_item = max(by_theme, key=lambda x: x["total_impressions"]) if by_theme else None
+
+    top_format_name = top_format_item["format"] if top_format_item else "N/A"
+    top_format_rate = top_format_item["avg_engagement_rate"] if top_format_item else 0.0
+    top_theme_name = top_theme_item["theme"] if top_theme_item else "N/A"
+
+    main_finding = f"Content strategy is led by '{top_format_name}' delivering an average {top_format_rate}% engagement rate, with '{top_theme_name}' driving the highest impression reach across {len(leaderboard)} analyzed social posts."
+
     return {
+        "summary": {
+            "total_posts": len(leaderboard),
+            "top_format": top_format_name,
+            "top_format_engagement_rate": top_format_rate,
+            "top_theme": top_theme_name,
+            "main_finding": main_finding
+        },
         "leaderboard": leaderboard,
         "by_format": by_format,
         "by_theme": by_theme
@@ -386,7 +413,7 @@ def get_commerce_analytics():
             "sample_review": pr["sample_review"],
             "units_sold": pr["total_units_sold"] or 0,
             "total_revenue": round(pr["total_revenue"] or 0.0, 2),
-            "estimated_gross_profit": round((pr["total_revenue"] or 0.0) * (pr["margin_percent"] / 100), 2)
+            "estimated_gross_profit": round((pr["total_revenue"] or 0.0) * ((pr["margin_percent"] or 0.0) / 100), 2)
         }
         for pr in products
     ]
@@ -402,6 +429,7 @@ def get_commerce_analytics():
     LEFT JOIN customers c ON cs.segment_id = c.segment_id
     LEFT JOIN orders o ON c.customer_id = o.customer_id
     GROUP BY cs.segment_id
+    ORDER BY segment_revenue DESC
     """).fetchall()
 
     segment_list = []
@@ -423,9 +451,44 @@ def get_commerce_analytics():
             "avg_customer_ltv": round(rev / cust_cnt, 2)
         })
 
+    # Repeat Purchase Rate
+    repeat_stats = cursor.execute("""
+    SELECT 
+        COUNT(DISTINCT customer_id) as total_unique_customers,
+        COUNT(CASE WHEN order_count > 1 THEN 1 END) as repeat_customers
+    FROM (
+        SELECT customer_id, COUNT(order_id) as order_count
+        FROM orders
+        GROUP BY customer_id
+    )
+    """).fetchone()
+    
+    total_unique_cust = (repeat_stats['total_unique_customers'] if repeat_stats else 1) or 1
+    repeat_cust_count = (repeat_stats['repeat_customers'] if repeat_stats else 0) or 0
+    repeat_rate = round((repeat_cust_count / total_unique_cust) * 100, 1)
+
     conn.close()
 
+    top_prod = product_list[0] if product_list else {}
+    avg_margin = round(sum(p["margin_percent"] for p in product_list) / max(1, len(product_list)), 1) if product_list else 0.0
+    top_seg = segment_list[0] if segment_list else {}
+
+    commerce_finding = f"Top-ranking product '{top_prod.get('product_name', 'N/A')}' generated ${top_prod.get('total_revenue', 0.0):,.2f} in revenue across a catalog of {len(product_list)} items with an average {avg_margin}% unit gross margin."
+    segment_finding = f"'{top_seg.get('segment_name', 'N/A')}' represents the primary customer segment (${top_seg.get('total_revenue', 0.0):,.2f} revenue, ${top_seg.get('avg_customer_ltv', 0.0):,.2f} avg LTV) with a {repeat_rate}% overall brand repeat purchase rate."
+
     return {
+        "summary": {
+            "top_product": top_prod.get("product_name", "N/A"),
+            "top_product_revenue": top_prod.get("total_revenue", 0.0),
+            "avg_margin_percent": avg_margin,
+            "total_catalog_size": len(product_list),
+            "main_finding": commerce_finding,
+            "top_segment_name": top_seg.get("segment_name", "N/A"),
+            "top_segment_revenue": top_seg.get("total_revenue", 0.0),
+            "top_segment_ltv": top_seg.get("avg_customer_ltv", 0.0),
+            "repeat_purchase_rate": repeat_rate,
+            "segments_main_finding": segment_finding
+        },
         "products": product_list,
         "segments": segment_list
     }
@@ -445,26 +508,46 @@ def get_funnel_analytics():
     FROM daily_kpis
     """).fetchone()
 
-    imp = totals["impressions"] or 1
-    visits = totals["visits"] or 1
-    pviews = totals["product_views"] or 1
-    carts = totals["add_to_carts"] or 1
-    orders = totals["orders"] or 1
+    imp = (totals["impressions"] if totals else 1) or 1
+    visits = (totals["visits"] if totals else 1) or 1
+    pviews = (totals["product_views"] if totals else 1) or 1
+    carts = (totals["add_to_carts"] if totals else 1) or 1
+    orders = (totals["orders"] if totals else 1) or 1
+    total_rev = (totals["revenue"] if totals else 0.0) or 0.0
 
     conn.close()
 
+    stages = [
+        {"stage": "1. Ad Impressions", "count": imp, "conversion_from_prev": 100.0},
+        {"stage": "2. Website Visits", "count": visits, "conversion_from_prev": round((visits / imp) * 100, 2)},
+        {"stage": "3. Product Page Views", "count": pviews, "conversion_from_prev": round((pviews / visits) * 100, 2)},
+        {"stage": "4. Add to Cart", "count": carts, "conversion_from_prev": round((carts / pviews) * 100, 2)},
+        {"stage": "5. Completed Orders", "count": orders, "conversion_from_prev": round((orders / carts) * 100, 2)}
+    ]
+
+    # Find bottleneck stage (lowest non-100% conversion rate)
+    sub_stages = stages[1:]
+    bottleneck_stage = min(sub_stages, key=lambda s: s["conversion_from_prev"]) if sub_stages else stages[0]
+    overall_conv = round((orders / visits) * 100, 2)
+
+    funnel_finding = f"The primary conversion bottleneck occurs at {bottleneck_stage['stage']} ({bottleneck_stage['conversion_from_prev']}% step conversion), resulting in an overall visit-to-order rate of {overall_conv}% across {visits:,} website visits."
+
     return {
-        "funnel_stages": [
-            {"stage": "1. Ad Impressions", "count": imp, "conversion_from_prev": 100.0},
-            {"stage": "2. Website Visits", "count": visits, "conversion_from_prev": round((visits / imp) * 100, 2)},
-            {"stage": "3. Product Page Views", "count": pviews, "conversion_from_prev": round((pviews / visits) * 100, 2)},
-            {"stage": "4. Add to Cart", "count": carts, "conversion_from_prev": round((carts / pviews) * 100, 2)},
-            {"stage": "5. Completed Orders", "count": orders, "conversion_from_prev": round((orders / carts) * 100, 2)}
-        ],
-        "overall_visit_to_order_conv_rate": round((orders / visits) * 100, 2),
-        "total_revenue": round(totals["revenue"], 2)
+        "summary": {
+            "total_impressions": imp,
+            "total_visits": visits,
+            "total_orders": orders,
+            "overall_conv_rate": overall_conv,
+            "primary_drop_off_stage": f"{bottleneck_stage['stage']} ({bottleneck_stage['conversion_from_prev']}%)",
+            "main_finding": funnel_finding
+        },
+        "funnel_stages": stages,
+        "overall_visit_to_order_conv_rate": overall_conv,
+        "total_revenue": round(total_rev, 2)
     }
 
 if __name__ == "__main__":
     print("Testing Analytics Engine...")
     print("Overview:", get_executive_overview()["summary"])
+    print("Commerce Summary:", get_commerce_analytics()["summary"])
+    print("Funnel Summary:", get_funnel_analytics()["summary"])

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Compass, Sparkles, CheckCircle2, AlertOctagon, Target, DollarSign, MessageSquare } from 'lucide-react';
 
-export default function StrategyView() {
+export default function StrategyView({ activeDataset }) {
   const [strategy, setStrategy] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -26,18 +26,20 @@ export default function StrategyView() {
     return <div className="loading-spinner"><Sparkles size={16} className="spin" /> Generating Strategic Intelligence Report...</div>;
   }
 
+  const brandName = activeDataset?.active_brand_name || 'Brand';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.75rem', maxWidth: '900px', margin: '0 auto' }}>
       {/* Editorial Report Header */}
       <div style={{ borderBottom: '2px solid var(--text-primary)', paddingBottom: '1rem' }}>
         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Strategic Intelligence Report
+          Strategic Intelligence Report &mdash; {brandName}
         </span>
         <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '0.2rem' }}>
           {strategy.title}
         </h1>
         <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
-          Data-driven strategic direction for NEXORA's next growth campaign based on 2025 performance.
+          Data-driven strategic direction for next growth campaign based on active dataset performance.
         </p>
       </div>
 
@@ -47,7 +49,7 @@ export default function StrategyView() {
           1. Strategic Summary & Position
         </div>
         <p style={{ fontSize: '0.95rem', color: 'var(--text-primary)', lineHeight: '1.6' }}>
-          Based on 2025 historical data, NEXORA achieves peak return when scaling mid-funnel creative assets (Reels & Carousels) to high-intent <strong>{strategy.target_audience.primary_segment}</strong> while enforcing tight cart-abandonment retargeting.
+          Based on empirical historical data, peak return is achieved by scaling top creative assets to high-intent <strong>{strategy.target_audience.primary_segment}</strong> while enforcing tight conversion and retargeting workflows.
         </p>
       </div>
 
@@ -58,9 +60,9 @@ export default function StrategyView() {
             <CheckCircle2 size={16} color="var(--badge-observed-text)" /> What is Working (High Impact)
           </div>
           <ul className="ai-list">
-            <li><strong>Q4 Festive Gifting:</strong> Delivered ${strategy.messaging_concept.evidence_badge.split('$')[1] || '305K revenue'} at 5.24x ROAS.</li>
-            <li><strong>Retention Workflows:</strong> 75.7% repeat rate with Remote Professionals driving $285 AOV.</li>
-            <li><strong>Creative Format:</strong> Short video Reels achieve 5.2% avg engagement.</li>
+            {strategy.what_is_working && strategy.what_is_working.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
           </ul>
         </div>
 
@@ -69,8 +71,9 @@ export default function StrategyView() {
             <AlertOctagon size={16} color="#f43f5e" /> What is Underperforming
           </div>
           <ul className="ai-list">
-            <li>Top-of-funnel TikTok standalone ads without retargeting pixels (1.05% conversion rate).</li>
-            <li>Single static image ads drive less than 1.2% CTR compared to 4.08% for video.</li>
+            {strategy.what_is_underperforming && strategy.what_is_underperforming.map((item, idx) => (
+              <li key={idx}>{item}</li>
+            ))}
           </ul>
         </div>
       </div>
@@ -82,7 +85,7 @@ export default function StrategyView() {
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.9rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0.75rem', background: 'var(--bg-subtle)', borderRadius: '6px', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>PRIMARY SEGMENT</span>
               <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{strategy.target_audience.primary_segment}</div>
